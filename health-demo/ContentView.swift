@@ -20,33 +20,26 @@ struct ContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                HealthDataCard(title: "睡眠", value: "\(sleepData.hours)小时 \(sleepData.minutes)分钟", icon: "moon.zzz.fill") {
+                HealthDataCard(title: "今日睡眠", value: "\(sleepData.hours)小时 \(sleepData.minutes)分钟", icon: "moon.zzz.fill") {
                     SleepChart(sleepHours: Double(sleepData.hours) + Double(sleepData.minutes) / 60)
                 }
                 
-                HealthDataCard(title: "步数", value: "\(stepCount) 步", icon: "figure.walk") {
+                HealthDataCard(title: "今日步数", value: "\(stepCount) 步", icon: "figure.walk") {
                     StepChart(steps: stepCount)
                 }
                 
-                HealthDataCard(title: "跑步", value: String(format: "%.2f 公里", runningDistance), icon: "figure.run") {
+                HealthDataCard(title: "今日跑步", value: String(format: "%.2f 公里", runningDistance), icon: "figure.run") {
                     RunningChart(distance: runningDistance)
                 }
                 
-                HealthDataCard(title: "卡路里", value: String(format: "%.0f 千卡", caloriesBurned), icon: "flame.fill") {
+                HealthDataCard(title: "今日卡路里", value: String(format: "%.0f 千卡", caloriesBurned), icon: "flame.fill") {
                     CalorieChart(calories: Int(caloriesBurned))
                 }
-                
-//                Button("打开聊天") {
-//                    showChat = true
-//                }.padding()
             }
             .padding()
         }
         .onAppear {
             self.requestHealthData()
-        }
-        .sheet(isPresented: $showChat) {
-            ChatView()
         }
     }
     
@@ -72,7 +65,8 @@ struct ContentView: View {
     
     private func querySleepData() {
         let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
-        let query = HKSampleQuery(sampleType: sleepType, predicate: nil, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+        let predicate = HKQuery.predicateForSamples(withStart: Calendar.current.startOfDay(for: Date()), end: Date(), options: .strictStartDate)
+        let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
             guard let sleepSamples = samples as? [HKCategorySample] else {
                 print("无法获取睡眠数据: \(error?.localizedDescription ?? "未知错误")")
                 return
@@ -94,7 +88,8 @@ struct ContentView: View {
     
     private func queryStepData() {
         let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
-        let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: nil, options: .cumulativeSum) { _, result, error in
+        let predicate = HKQuery.predicateForSamples(withStart: Calendar.current.startOfDay(for: Date()), end: Date(), options: .strictStartDate)
+        let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
             guard let result = result, let sum = result.sumQuantity() else {
                 print("无法获取步数数据: \(error?.localizedDescription ?? "未知错误")")
                 return
@@ -109,7 +104,8 @@ struct ContentView: View {
     
     private func queryRunningData() {
         let runningType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
-        let query = HKStatisticsQuery(quantityType: runningType, quantitySamplePredicate: nil, options: .cumulativeSum) { _, result, error in
+        let predicate = HKQuery.predicateForSamples(withStart: Calendar.current.startOfDay(for: Date()), end: Date(), options: .strictStartDate)
+        let query = HKStatisticsQuery(quantityType: runningType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
             guard let result = result, let sum = result.sumQuantity() else {
                 print("无法获取跑步距离数据: \(error?.localizedDescription ?? "未知错误")")
                 return
@@ -124,7 +120,8 @@ struct ContentView: View {
     
     private func queryCalorieData() {
         let calorieType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!
-        let query = HKStatisticsQuery(quantityType: calorieType, quantitySamplePredicate: nil, options: .cumulativeSum) { _, result, error in
+        let predicate = HKQuery.predicateForSamples(withStart: Calendar.current.startOfDay(for: Date()), end: Date(), options: .strictStartDate)
+        let query = HKStatisticsQuery(quantityType: calorieType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
             guard let result = result, let sum = result.sumQuantity() else {
                 print("无法获取卡路里数据: \(error?.localizedDescription ?? "未知错误")")
                 return
