@@ -35,11 +35,24 @@ struct ContentView: View {
                 HealthDataCard(title: "今日卡路里", value: String(format: "%.0f 千卡", caloriesBurned), icon: "flame.fill") {
                     CalorieChart(calories: Int(caloriesBurned))
                 }
+                
+                Button(action: {
+                    showChat = true
+                }) {
+                    Text("打开聊天")
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
             }
             .padding()
         }
         .onAppear {
             self.requestHealthData()
+        }
+        .sheet(isPresented: $showChat) {
+            ChatView()
         }
     }
     
@@ -50,7 +63,7 @@ struct ContentView: View {
             HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
             HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!
         ]
-        
+
         healthStore.requestAuthorization(toShare: nil, read: typesToRead) { success, error in
             if success {
                 self.querySleepData()

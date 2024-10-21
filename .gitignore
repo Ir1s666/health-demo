@@ -1,0 +1,6 @@
+# Ignore all .xcconfig files
+*.xcconfig
+
+# Other common ignores
+.DS_Store
+build/

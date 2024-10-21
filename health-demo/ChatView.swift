@@ -73,34 +73,52 @@ struct ChatView: View {
             return
         }
         
+        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "API_KEY") else {
+            print("MY_ENV_VARIABLE not found")
+            completion("API_KEY 环境变量未设置1")
+            return
+        }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.addValue("Bearer sk-key", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
         let body: [String: Any] = [
             "model": "gpt-4o-mini",
-            "stream": false,
             "messages": [
                 ["role": "system", "content": "You are a helpful assistant."],
                 ["role": "user", "content": message]
             ]
         ]
         
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            completion("请求体序列化错误: \(error.localizedDescription)")
+            return
+        }
         
-        let delegate = CustomURLSessionDelegate()
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30.0
+        configuration.timeoutIntervalForResource = 60.0
+        
+        let session = URLSession(configuration: configuration)
         
         session.dataTask(with: request) { data, response, error in
             if let error = error {
-                print("网络错误: \(error.localizedDescription)")
-                completion("错误: \(error.localizedDescription)")
+                completion("网络错误: \(error.localizedDescription)")
                 return
             }
             
-            if let httpResponse = response as? HTTPURLResponse {
-                print("HTTP 状态码: \(httpResponse.statusCode)")
+            guard let httpResponse = response as? HTTPURLResponse else {
+                completion("无效的响应")
+                return
+            }
+            
+            if httpResponse.statusCode != 200 {
+                completion("HTTP 错误: \(httpResponse.statusCode)")
+                return
             }
             
             guard let data = data else {
@@ -119,7 +137,6 @@ struct ChatView: View {
                     completion("无法解析API响应")
                 }
             } catch {
-                print("JSON解析错误: \(error.localizedDescription)")
                 completion("JSON解析错误: \(error.localizedDescription)")
             }
         }.resume()
