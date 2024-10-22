@@ -1,7 +1,7 @@
 import SwiftUI
 import Foundation
 
-struct Message: Identifiable {
+struct Message: Identifiable, Codable {
     let id = UUID()
     let content: String
     let isUser: Bool
@@ -49,6 +49,9 @@ struct ChatView: View {
             }
             .padding(.bottom)
         }
+        .onAppear {
+            loadMessages() // 加载消息
+        }
     }
     
     func sendMessage() {
@@ -57,25 +60,27 @@ struct ChatView: View {
         let userMessage = Message(content: newMessage, isUser: true)
         messages.append(userMessage)
         
-        callChatGPTAPI(with: newMessage) { response in
+        // 传递上下文给 API
+        callChatGPTAPI(with: messages) { response in
             DispatchQueue.main.async {
                 let aiMessage = Message(content: response, isUser: false)
                 messages.append(aiMessage)
+                saveMessages() // 保存消息
             }
         }
         
         newMessage = ""
     }
     
-    func callChatGPTAPI(with message: String, completion: @escaping (String) -> Void) {
+    func callChatGPTAPI(with messages: [Message], completion: @escaping (String) -> Void) {
         guard let url = URL(string: "https://api.openai-next.com/v1/chat/completions") else {
             completion("API URL无效")
             return
         }
         
-        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "API_KEY") else {
+        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "API_KEY") as? String else {
             print("MY_ENV_VARIABLE not found")
-            completion("API_KEY 环境变量未设置1")
+            completion("API_KEY 环境变量未设置")
             return
         }
         
@@ -84,12 +89,14 @@ struct ChatView: View {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
+        // 构建消息数组
+        let messagesForAPI = messages.map { message in
+            ["role": message.isUser ? "user" : "assistant", "content": message.content]
+        }
+        
         let body: [String: Any] = [
             "model": "gpt-4o-mini",
-            "messages": [
-                ["role": "system", "content": "You are a helpful assistant."],
-                ["role": "user", "content": message]
-            ]
+            "messages": messagesForAPI
         ]
         
         do {
@@ -140,6 +147,19 @@ struct ChatView: View {
                 completion("JSON解析错误: \(error.localizedDescription)")
             }
         }.resume()
+    }
+    
+    private func saveMessages() {
+        if let encoded = try? JSONEncoder().encode(messages) {
+            UserDefaults.standard.set(encoded, forKey: "savedMessages")
+        }
+    }
+    
+    private func loadMessages() {
+        if let data = UserDefaults.standard.data(forKey: "savedMessages"),
+           let decodedMessages = try? JSONDecoder().decode([Message].self, from: data) {
+            messages = decodedMessages
+        }
     }
 }
 
