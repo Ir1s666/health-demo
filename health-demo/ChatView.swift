@@ -38,7 +38,7 @@ class CustomURLSessionDelegate: NSObject, URLSessionDataDelegate, URLSessionDele
         let streamData = data.split(separator: 10) // 按换行符分割数据
 
         for line in streamData {
-            let jsonData = Data(line) 
+            let jsonData = Data(line)
             do {
                 // 尝试将 jsonData 转换为字符串
                 guard let jsonString = String(data: jsonData, encoding: .utf8) else {
@@ -52,7 +52,7 @@ class CustomURLSessionDelegate: NSObject, URLSessionDataDelegate, URLSessionDele
                 // 检查是否为 [DONE]
                 if jsonStringWithoutPrefix == "[DONE]" {
                     print("流式渲染完成")
-                    return 
+                    return
                 }
 
                 // 将处理后的字符串转换为 Data
@@ -94,6 +94,7 @@ class CustomURLSessionDelegate: NSObject, URLSessionDataDelegate, URLSessionDele
 struct ChatView: View {
     @State private var messages: [Message] = []
     @State private var newMessage = ""
+    @State private var dataTask: URLSessionDataTask? // 存储当前的数据任务
 
     var body: some View {
         VStack {
@@ -134,7 +135,10 @@ struct ChatView: View {
     
     func sendMessage() {
         guard !newMessage.isEmpty else { return }
-        
+
+        // 中断上一次的请求
+        interruptCurrentRequest()
+
         let userMessage = Message(content: newMessage, isUser: true)
         messages.append(userMessage)
 
@@ -144,6 +148,11 @@ struct ChatView: View {
         }
         
         newMessage = ""
+    }
+
+    func interruptCurrentRequest() {
+        dataTask?.cancel() // 中断当前的数据任务
+        dataTask = nil // 清空数据任务
     }
     
     func callChatGPTAPI() {
@@ -189,18 +198,18 @@ struct ChatView: View {
         var content = ""
         sessionDelegate.onSuccess = { apiResponse in
             if let firstChoice = apiResponse.choices.first {
-                    if let deltaContent = firstChoice.delta.content {
-                        content += deltaContent // 使用 deltaContent 进行拼接
+                if let deltaContent = firstChoice.delta.content {
+                    content += deltaContent // 使用 deltaContent 进行拼接
 
-                        DispatchQueue.main.async {
-                            // 更新最后一条消息的内容
-                            if !messages.isEmpty {
-                                messages[messages.count - 1].content = content 
-                            }
-                            saveMessages()            
+                    DispatchQueue.main.async {
+                        // 更新最后一条消息的内容
+                        if !messages.isEmpty {
+                            messages[messages.count - 1].content = content 
                         }
+                        saveMessages()            
                     }
                 }
+            }
         }
 
         let session = URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
@@ -209,8 +218,8 @@ struct ChatView: View {
         var aiMessage = Message(content: "", isUser: false) // 初始内容为空
         messages.append(aiMessage) // 直接在这里添加
 
-        let dataTask = session.dataTask(with: request)
-        dataTask.resume()
+        dataTask = session.dataTask(with: request) // 存储数据任务
+        dataTask?.resume()
     }
     
     private func saveMessages() {
